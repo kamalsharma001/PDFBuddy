@@ -4,7 +4,7 @@
 
 An AI-powered PDF chat and document intelligence platform that helps you understand, explore, and retrieve information from your documents through natural conversations.
 
-[Live Demo](YOUR_LIVE_DEMO_URL) · [GitHub Repository](YOUR_GITHUB_REPOSITORY_URL) · [Author Profile](https://github.com/kamalsharma001)
+[Live Demo](https://pdfbuddy-platform.vercel.app/) · [GitHub Repository](https://github.com/kamalsharma001/PDFBuddy) · [Author Profile](https://github.com/kamalsharma001)
 
 ---
 

@@ -1,0 +1,39 @@
+# ==============================================================================
+# PDFBuddy Render Blueprint — Production Web Service (Docker)
+# ==============================================================================
+services:
+  - type: web
+    name: pdfbuddy-backend
+    env: docker
+    region: oregon
+    plan: free
+    rootDir: backend
+    dockerfilePath: Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: DATABASE_URL
+        sync: false # Neon PostgreSQL connection string (with ?sslmode=require)
+      - key: GOOGLE_CLIENT_ID
+        sync: false # From Google Cloud Console
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false # From Google Cloud Console
+      - key: GOOGLE_REDIRECT_URI
+        sync: false # e.g. https://<backend-service>.onrender.com/auth/google/callback
+      - key: JWT_SECRET_KEY
+        generateValue: true # Render will automatically generate a secure random secret
+      - key: FRONTEND_URL
+        value: https://pdfbuddy-platform.vercel.app
+      - key: CORS_ORIGINS
+        value: https://pdfbuddy-platform.vercel.app,http://localhost:5173
+      - key: GEMINI_API_KEY
+        sync: false # Google AI Studio API key
+      - key: R2_ACCOUNT_ID
+        sync: false # Cloudflare Account ID
+      - key: R2_ACCESS_KEY_ID
+        sync: false # Cloudflare R2 API Token Access Key ID
+      - key: R2_SECRET_ACCESS_KEY
+        sync: false # Cloudflare R2 API Token Secret Access Key
+      - key: R2_BUCKET_NAME
+        sync: false # Cloudflare R2 bucket name (e.g. pdfbuddy-storage)

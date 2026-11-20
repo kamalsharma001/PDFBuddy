@@ -1,0 +1,16 @@
+# ==============================================================================
+# PDFBuddy Local Development & Container Testing Docker Compose
+# ==============================================================================
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: pdfbuddy-backend
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      - PORT=8000
+    restart: unless-stopped

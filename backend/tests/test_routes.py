@@ -273,5 +273,226 @@ def test_post_login_redirect_open_redirect_protection(monkeypatch: pytest.Monkey
     assert redirect_url == "http://localhost:5173/workspace"
 
 
+def test_gemini_client_model_configuration() -> None:
+    from app.services.gemini_client import GeminiClient
+
+    client = GeminiClient()
+    models = client.get_chat_models()
+    assert models[0] == "gemini-3.8-flash"
+    assert "gemini-3.5-flash-lite" in models
+    assert "gemini-2.5-flash" not in models  # Retired model excluded from default fallback chain
+
+
+@pytest.mark.asyncio
+async def test_gemini_client_fallback_chain_on_503(monkeypatch: pytest.MonkeyPatch) -> None:
+    import httpx
+    from app.services.gemini_client import GeminiClient
+
+    client = GeminiClient()
+    monkeypatch.setattr(client.settings, "gemini_api_key", "test-mock-api-key")
+
+    async def noop_sleep(seconds: float) -> None:
+        pass
+
+    monkeypatch.setattr("app.services.gemini_client.asyncio.sleep", noop_sleep)
+
+    call_models = []
+
+    async def mock_post(self, url, **kwargs):
+        model_name = str(url).split("models/")[1].split(":")[0]
+        call_models.append(model_name)
+        if "gemini-3.8-flash:" in str(url):
+            # Primary model returns transient 503
+            req = httpx.Request("POST", url)
+            resp = httpx.Response(503, request=req, text='{"error": {"message": "High demand"}}')
+            raise httpx.HTTPStatusError("503 Service Unavailable", request=req, response=resp)
+        elif "gemini-3.5-flash-lite:" in str(url):
+            # Fallback model succeeds
+            req = httpx.Request("POST", url)
+            return httpx.Response(
+                200,
+                request=req,
+                json={"candidates": [{"content": {"parts": [{"text": "Answer from fallback [Page 2]"}]}}]},
+            )
+        req = httpx.Request("POST", url)
+        return httpx.Response(200, request=req, json={"candidates": []})
+
+    monkeypatch.setattr(httpx.AsyncClient, "post", mock_post)
+
+    answer = await client.answer_question(
+        question="What is the revenue?",
+        context_chunks=[{"page_number": 2, "chunk_text": "Revenue was $10M."}],
+        previous_messages=[],
+    )
+    assert "Answer from fallback [Page 2]" in answer
+    assert "gemini-3.8-flash" in call_models
+    assert "gemini-3.5-flash-lite" in call_models
+
+
+@pytest.mark.asyncio
+async def test_gemini_client_permanent_error_aborts_immediately(monkeypatch: pytest.MonkeyPatch) -> None:
+    import httpx
+    from app.services.gemini_client import GeminiClient
+
+    client = GeminiClient()
+    monkeypatch.setattr(client.settings, "gemini_api_key", "test-mock-api-key")
+
+    call_count = 0
+
+    async def mock_post(self, url, **kwargs):
+        nonlocal call_count
+        call_count += 1
+        req = httpx.Request("POST", url)
+        resp = httpx.Response(401, request=req, text='{"error": {"message": "API key invalid"}}')
+        raise httpx.HTTPStatusError("401 Unauthorized", request=req, response=resp)
+
+    monkeypatch.setattr(httpx.AsyncClient, "post", mock_post)
+
+    answer = await client.answer_question(
+        question="Hello",
+        context_chunks=[],
+        previous_messages=[],
+    )
+    assert "Authentication with the AI service failed" in answer
+    assert call_count == 1  # Aborted immediately, did not retry other models
+
+
+@pytest.mark.asyncio
+async def test_gemini_client_all_models_unavailable_clean_message(monkeypatch: pytest.MonkeyPatch) -> None:
+    import httpx
+    from app.services.gemini_client import GeminiClient
+
+    client = GeminiClient()
+    monkeypatch.setattr(client.settings, "gemini_api_key", "test-mock-api-key")
+
+    async def noop_sleep(seconds: float) -> None:
+        pass
+
+    monkeypatch.setattr("app.services.gemini_client.asyncio.sleep", noop_sleep)
+
+    async def mock_post(self, url, **kwargs):
+        req = httpx.Request("POST", url)
+        resp = httpx.Response(503, request=req, text='{"error": {"message": "High demand across region"}}')
+        raise httpx.HTTPStatusError("503 Service Unavailable", request=req, response=resp)
+
+    monkeypatch.setattr(httpx.AsyncClient, "post", mock_post)
+
+    answer = await client.answer_question(
+        question="Summarize",
+        context_chunks=[],
+        previous_messages=[],
+    )
+    assert "temporarily experiencing high demand" in answer
+    assert "503" not in answer  # Clean user-friendly message, no raw status code
+
+
+@pytest.mark.asyncio
+async def test_gemini_client_429_quota_exhausted_fails_over_immediately(monkeypatch: pytest.MonkeyPatch) -> None:
+    import httpx
+    from app.services.gemini_client import GeminiClient
+
+    client = GeminiClient()
+    monkeypatch.setattr(client.settings, "gemini_api_key", "test-mock-api-key")
+
+    call_counts = {}
+
+    async def mock_post(self, url, **kwargs):
+        model_name = str(url).split("models/")[1].split(":")[0]
+        call_counts[model_name] = call_counts.get(model_name, 0) + 1
+
+        if "gemini-3.8-flash:" in str(url):
+            # Primary model returns quota exhaustion 429
+            req = httpx.Request("POST", url)
+            resp = httpx.Response(
+                429,
+                request=req,
+                text='{"error": {"code": 429, "message": "Resource has been exhausted", "status": "RESOURCE_EXHAUSTED"}}',
+            )
+            raise httpx.HTTPStatusError("429 Too Many Requests", request=req, response=resp)
+        elif "gemini-3.5-flash-lite:" in str(url):
+            # Fallback model succeeds
+            req = httpx.Request("POST", url)
+            return httpx.Response(
+                200,
+                request=req,
+                json={"candidates": [{"content": {"parts": [{"text": "Quota fallback answer"}]}}]},
+            )
+        req = httpx.Request("POST", url)
+        return httpx.Response(200, request=req, json={"candidates": []})
+
+    monkeypatch.setattr(httpx.AsyncClient, "post", mock_post)
+
+    answer = await client.answer_question(
+        question="What is this?",
+        context_chunks=[],
+        previous_messages=[],
+    )
+    assert answer == "Quota fallback answer"
+    # Quota exhaustion must not be retried on the same model (max 1 call to primary model)
+    assert call_counts["gemini-3.8-flash"] == 1
+    assert call_counts["gemini-3.5-flash-lite"] == 1
+
+
+@pytest.mark.asyncio
+async def test_gemini_client_filters_internal_thought_parts(monkeypatch: pytest.MonkeyPatch) -> None:
+    import httpx
+    from app.services.gemini_client import GeminiClient
+
+    client = GeminiClient()
+    monkeypatch.setattr(client.settings, "gemini_api_key", "test-mock-api-key")
+
+    async def mock_post(self, url, **kwargs):
+        req = httpx.Request("POST", url)
+        return httpx.Response(
+            200,
+            request=req,
+            json={
+                "candidates": [
+                    {
+                        "content": {
+                            "parts": [
+                                {"text": "Thinking step by step...", "thought": True},
+                                {"text": "The final document answer is 42 [Page 1]."},
+                            ]
+                        }
+                    }
+                ]
+            },
+        )
+
+    monkeypatch.setattr(httpx.AsyncClient, "post", mock_post)
+
+    answer = await client.answer_question("Question", [], [])
+    assert "Thinking step by step" not in answer  # Internal thought filtered out
+    assert answer == "The final document answer is 42 [Page 1]."
+
+
+@pytest.mark.asyncio
+async def test_gemini_client_stream_answer_question(monkeypatch: pytest.MonkeyPatch) -> None:
+    import httpx
+    from app.services.gemini_client import GeminiClient
+
+    client = GeminiClient()
+    monkeypatch.setattr(client.settings, "gemini_api_key", "test-mock-api-key")
+
+    async def mock_post(self, url, **kwargs):
+        req = httpx.Request("POST", url)
+        return httpx.Response(
+            200,
+            request=req,
+            json={"candidates": [{"content": {"parts": [{"text": "Stream chunk response"}]}}]},
+        )
+
+    monkeypatch.setattr(httpx.AsyncClient, "post", mock_post)
+
+    chunks = []
+    async for chunk in client.stream_answer_question("Stream test", [], []):
+        chunks.append(chunk)
+
+    assert len(chunks) == 1
+    assert chunks[0] == "Stream chunk response"
+
+
+
 
 

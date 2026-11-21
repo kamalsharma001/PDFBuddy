@@ -1685,7 +1685,7 @@
 }
 
 .right-column {
-  width: 480px;
+  width: clamp(480px, 42vw, 820px);
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -2236,64 +2236,127 @@
 /* -----------------------------------------------------------------------------
    6. PDF Viewer & Controls (PDFViewer.jsx)
    ----------------------------------------------------------------------------- */
-.pdf-viewer {
+.pdf-viewer-panel {
   flex: 1;
   min-height: 0;
-  gap: 12px;
+  padding: 8px 10px !important;
+  gap: 8px;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.pdf-viewer-panel:fullscreen {
+  padding: 12px !important;
+  background-color: var(--bg-main);
+  border: none;
+  border-radius: 0;
 }
 
 .pdf-toolbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding-bottom: 10px;
-  border-bottom: 1px solid var(--border-color);
-  gap: 8px;
+  gap: 6px;
+  padding: 4px 8px;
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  min-height: 38px;
   flex-wrap: wrap;
 }
 
 .pdf-toolbar-group {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
+}
+
+.toolbar-divider {
+  width: 1px;
+  height: 16px;
+  background-color: var(--border-color);
+  margin: 0 2px;
+  flex-shrink: 0;
 }
 
 .toolbar-btn {
-  background-color: var(--bg-input);
-  border: 1px solid var(--border-color);
+  background: transparent;
+  background-color: transparent;
+  border: 1px solid transparent;
   border-radius: 4px;
-  color: var(--text-primary);
+  color: var(--text-secondary);
   font-size: 12px;
-  padding: 4px 8px;
+  font-weight: 500;
   cursor: pointer;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.15s ease;
+  gap: 4px;
+  padding: 4px 8px;
+  transition: color 0.15s ease, background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.toolbar-btn.icon-btn {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+}
+
+.toolbar-btn.text-btn {
+  padding: 4px 8px;
+  font-size: 11px;
+  font-weight: 500;
 }
 
 .toolbar-btn:hover:not(:disabled) {
-  border-color: var(--primary-teal);
+  background-color: var(--bg-card);
+  color: var(--text-primary);
+  border-color: var(--border-color);
+}
+
+.toolbar-btn.active {
+  background-color: rgba(46, 196, 182, 0.12);
+  color: var(--primary-teal);
+  border-color: rgba(46, 196, 182, 0.35);
+  font-weight: 600;
+}
+
+.toolbar-btn:focus-visible {
+  outline: 2px solid var(--primary-teal);
+  outline-offset: 1px;
 }
 
 .toolbar-btn:disabled {
-  opacity: 0.4;
+  opacity: 0.35;
   cursor: not-allowed;
+  pointer-events: none;
 }
 
-.page-jump-input {
-  width: 44px;
-  background-color: var(--bg-input);
+.page-input-form {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.page-input {
+  width: 36px;
+  height: 26px;
+  padding: 2px 4px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 500;
+  text-align: center;
+  background-color: var(--bg-card);
   border: 1px solid var(--border-color);
   border-radius: 4px;
   color: var(--text-primary);
-  font-family: var(--font-mono);
-  font-size: 12px;
-  text-align: center;
-  padding: 4px 2px;
 }
 
-.page-jump-input:focus {
+.page-input:focus {
   border-color: var(--primary-teal);
   outline: none;
 }
@@ -2302,37 +2365,30 @@
   font-size: 12px;
   color: var(--text-secondary);
   font-family: var(--font-mono);
+  white-space: nowrap;
 }
 
-.zoom-label {
+.zoom-percentage-badge {
   font-size: 11px;
   font-family: var(--font-mono);
   color: var(--text-secondary);
-  min-width: 36px;
+  min-width: 40px;
   text-align: center;
+  display: inline-block;
+  user-select: none;
 }
 
-.external-link {
-  color: var(--primary-teal);
-  font-size: 12px;
-  text-decoration: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.external-link:hover {
-  text-decoration: underline;
-}
-
-.pdf-document-wrapper {
+.pdf-frame-container {
   flex: 1;
   min-height: 0;
+  width: 100%;
   display: flex;
+  flex-direction: column;
   background-color: #0E131C;
   border: 1px solid var(--border-color);
-  border-radius: 8px;
+  border-radius: 6px;
   overflow: hidden;
+  position: relative;
 }
 
 .viewer-frame {
@@ -2340,6 +2396,7 @@
   height: 100%;
   border: none;
   background-color: #FFFFFF;
+  display: block;
 }
 
 /* -----------------------------------------------------------------------------

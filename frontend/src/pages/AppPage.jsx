@@ -216,6 +216,7 @@ export function AppPage({
               title={activeDocument?.title}
               url={previewUrl}
               targetPage={targetPage}
+              totalPages={activeDocument?.page_count || 1}
               onPageChange={(p) => setTargetPage(p)}
             />
           </div>

@@ -33,6 +33,10 @@ class Settings(BaseModel):
 
     # AI Model (Google Gemini)
     gemini_api_key: str = ""
+    gemini_chat_model: str = "gemini-3.8-flash"
+    gemini_fallback_models: str = "gemini-3.5-flash-lite"
+    gemini_embedding_model: str = "gemini-embedding-001"
+    gemini_embedding_dim: int = 768
 
     # Cloudflare R2 Storage (S3-compatible)
     r2_account_id: str = ""
@@ -85,6 +89,10 @@ def get_settings() -> Settings:
         frontend_url=frontend,
         cors_origins=os.getenv("CORS_ORIGINS", ""),
         gemini_api_key=os.getenv("GEMINI_API_KEY", ""),
+        gemini_chat_model=os.getenv("GEMINI_CHAT_MODEL", "gemini-3.8-flash").strip(),
+        gemini_fallback_models=os.getenv("GEMINI_FALLBACK_MODELS", "gemini-3.5-flash-lite").strip(),
+        gemini_embedding_model=os.getenv("GEMINI_EMBEDDING_MODEL", "gemini-embedding-001").strip(),
+        gemini_embedding_dim=int(os.getenv("GEMINI_EMBEDDING_DIM", "768")),
         r2_account_id=os.getenv("R2_ACCOUNT_ID", ""),
         r2_access_key_id=os.getenv("R2_ACCESS_KEY_ID", ""),
         r2_secret_access_key=os.getenv("R2_SECRET_ACCESS_KEY", ""),
